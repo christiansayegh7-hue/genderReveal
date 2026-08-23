@@ -661,40 +661,37 @@ envelopeVideo.addEventListener('error', () => { if (opened) finishOpening(); });
   // Starting numbers below just make the bar feel alive; replace with a real
   // backend (e.g. a simple form-to-database service) if you want a tally
   // shared across all your guests' devices.
-  let voteCounts = JSON.parse(localStorage.getItem('genderVoteCounts') || 'null') || { girl: 50, boy: 50 };
-  let myVote = localStorage.getItem('genderMyVote') || null;
+  function doPost(e) {
+  const data = JSON.parse(e.postData.contents);
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  const voteGirlBtn = document.getElementById('voteGirl');
-  const voteBoyBtn = document.getElementById('voteBoy');
-  const segGirl = document.getElementById('segGirl');
-  const segBoy = document.getElementById('segBoy');
-  const pctGirl = document.getElementById('pctGirl');
-  const pctBoy = document.getElementById('pctBoy');
-
-  function renderVotes(){
-    const total = voteCounts.girl + voteCounts.boy;
-    const gPct = Math.round((voteCounts.girl / total) * 100);
-    const bPct = 100 - gPct;
-    segGirl.style.width = gPct + '%';
-    segBoy.style.width = bPct + '%';
-    pctGirl.textContent = gPct + '% Girl';
-    pctBoy.textContent = bPct + '% Boy';
-    voteGirlBtn.classList.toggle('selected', myVote === 'girl');
-    voteBoyBtn.classList.toggle('selected', myVote === 'boy');
-  }
-  function castVote(team){
-    if (myVote === team) return;
-    if (myVote) voteCounts[myVote] = Math.max(0, voteCounts[myVote] - 1);
-    voteCounts[team]++;
-    myVote = team;
-    localStorage.setItem('genderVoteCounts', JSON.stringify(voteCounts));
-    localStorage.setItem('genderMyVote', myVote);
-    renderVotes();
+  if (data.type === 'vote') {
+    let sheet = ss.getSheetByName('Votes');
+    if (!sheet) sheet = ss.insertSheet('Votes');
+    sheet.appendRow([new Date(), data.choice]);
+  } else {
+    const sheet = ss.getSheets()[0];
+    sheet.appendRow([new Date(), data.name, data.attending, data.guess, data.message]);
   }
 
-  voteGirlBtn.addEventListener('click', () => castVote('girl'));
-  voteBoyBtn.addEventListener('click', () => castVote('boy'));
-  renderVotes();
+  return ContentService.createTextOutput(JSON.stringify({status: "success"}))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function doGet(e) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('Votes');
+  let girl = 0, boy = 0;
+  if (sheet) {
+    const values = sheet.getDataRange().getValues();
+    for (let i = 0; i < values.length; i++) {
+      if (values[i][1] === 'girl') girl++;
+      if (values[i][1] === 'boy') boy++;
+    }
+  }
+  return ContentService.createTextOutput(JSON.stringify({girl, boy}))
+    .setMimeType(ContentService.MimeType.JSON);
+}
   // RSVP form (decorative — connect to a real backend / form service to actually collect responses)
   const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz5UQo7VVCnqf0m9uUr92dW_qDX0-DFaW35nsGl3U3cM0rs-5YEqmbLyU8uTMBOuLOS/exec";
 
